@@ -1,0 +1,28 @@
+# Entornos
+.venv/
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Herramientas
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Datos sensibles y de runtime — NUNCA versionar
+*.pfx
+*.p12
+*.pem
+*.key
+storage/
+data/
+certs/

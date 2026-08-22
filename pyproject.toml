@@ -1,0 +1,100 @@
+[project]
+name = "sunat-biller"
+version = "0.1.0"
+description = "Facturador electrónico SUNAT (Perú) como microservicio"
+authors = [
+    {name = "Cristian Monzon",email = "cristian-02-@live.com"}
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard] (>=0.141.1,<0.142.0)",
+    "uvicorn (>=0.52.1,<0.53.0)",
+    "pydantic (>=2.13.4,<3.0.0)",
+    "pydantic-settings (>=2.0.0,<3.0.0)",
+    "sqlalchemy (>=2.0.0,<3.0.0)",
+    "psycopg2-binary (>=2.9.0,<3.0.0)",
+    "alembic (>=1.13.0,<2.0.0)",
+    "lxml (>=5.3.0,<6.0.0)",
+    "signxml (>=4.0.0,<5.0.0)",
+    "cryptography (>=44.0.0,<47.0.0)",
+    "httpx (>=0.28.0,<0.29.0)",
+    "python-multipart (>=0.0.20,<0.1.0)",
+    "redis (>=5.2.0,<7.0.0)",
+    "dramatiq[redis] (>=1.17.0,<2.0.0)"
+]
+
+# NOTA: las dependencias de PDF (weasyprint, qrcode) entran en la Etapa 2.
+
+[tool.poetry]
+packages = [
+    {include = "app"}
+]
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.3.0"
+pytest-cov = ">=6.0.0"
+pytest-asyncio = ">=0.25.0"
+respx = ">=0.22.0"
+freezegun = ">=1.5.0"
+ruff = ">=0.9.0"
+
+[tool.poetry.scripts]
+dev = "app.main:dev"
+prod = "app.main:prod"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+# ---------------------------------------------------------------- herramientas
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+extend-exclude = [".venv", "alembic/versions"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",    # pycodestyle
+    "F",         # pyflakes
+    "I",         # isort
+    "N",         # pep8-naming
+    "UP",        # pyupgrade
+    "B",         # bugbear
+    "C4",        # comprehensions
+    "SIM",       # simplify
+    "RUF",       # ruff
+]
+ignore = [
+    "B008",      # Depends() en defaults es el idioma de FastAPI
+    "N818",      # nuestras excepciones de dominio no se llaman *Error por sufijo obligatorio
+    "N812",      # `date as Date` evita chocar con nombres de campo
+    "UP042",     # `str, Enum` es deliberado: Pydantic y SQLAlchemy lo serializan mejor que StrEnum
+    "RUF001",    # la documentación está en español y usa guiones largos a propósito
+    "RUF002",
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra --strict-markers"
+markers = [
+    "beta: pruebas end-to-end contra el ambiente BETA real de SUNAT (requieren red y credenciales; opt-in)",
+    "db: requiere PostgreSQL activo",
+]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/main.py", "alembic/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

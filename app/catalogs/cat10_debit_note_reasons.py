@@ -1,0 +1,10 @@
+"""Catálogo 10 — Tipo de Nota de Débito."""
+
+CAT10_DEBIT_NOTE_REASONS: dict[str, str] = {
+    "01": "INTERESES POR MORA",
+    "02": "AUMENTO EN EL VALOR",
+    "03": "PENALIDADES/ OTROS CONCEPTOS",
+    "10": "AJUSTES DE OPERACIONES DE EXPORTACION",
+    "11": "AJUSTES AFECTOS AL IVAP",
+    "12": "OTROS CONCEPTOS",
+}
