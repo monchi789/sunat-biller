@@ -40,17 +40,17 @@ Copiar este plan aprobado a **`/home/monchi789/Projects/sunat-biller/PLAN.md`** 
 ### Etapa 1 — Factura electrónica end-to-end
 - [x] 1.1 Bootstrap del repositorio
 - [~] 1.2 Núcleo de infraestructura (`app/core/`) — config, errors, logging listos; falta dependencies y main
-- [ ] 1.3 Migraciones Alembic
+- [x] 1.3 Migraciones Alembic
 - [x] 1.4 Catálogos SUNAT (`app/catalogs/`)
 - [x] 1.5 Dominio (`app/domain/`)
-- [ ] 1.6 Servicios base (crypto, storage, audit)
-- [ ] 1.7 Configuración multi-empresa (companies, api-keys, certificates, series)
+- [~] 1.6 Servicios base — crypto y storage listos; falta audit
+- [~] 1.7 Configuración multi-empresa — series listo; faltan companies, api-keys, certificates
 - [~] 1.8 Generación y firma del XML — namespaces, signer, zip, cdr_parser, ubl_invoice listos
-- [ ] 1.9 Cliente SUNAT
+- [x] 1.9 Cliente SUNAT
 - [ ] 1.10 Emisión de factura
 - [ ] 1.11 Webhooks salientes
 - [ ] 1.12 Worker
-- [~] 1.13 Tests — 185 verdes (money, tax_engine, catálogos, letras, naming, firma, UBL)
+- [~] 1.13 Tests — 236 verdes (dominio, catálogos, firma, UBL, SOAP, migraciones, concurrencia)
 - [ ] 1.14 Documentación
 
 ### Etapa 2 — Núcleo completo
