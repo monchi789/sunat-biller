@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from app.models.document_series import DocumentSeries
     from app.models.idempotency import IdempotencyKey
     from app.models.voided_document import VoidedDocument
+    from app.models.webhook import WebhookEndpoint
 
 
 @final
@@ -52,3 +53,4 @@ class Company(Base, SoftDeleteMixin, TimestampUpdateMixin):
     daily_summaries: Mapped[list[DailySummary]] = relationship(back_populates="company")
     voided_documents: Mapped[list[VoidedDocument]] = relationship(back_populates="company")
     idempotency_keys: Mapped[list[IdempotencyKey]] = relationship(back_populates="company")
+    webhook_endpoints: Mapped[list[WebhookEndpoint]] = relationship(back_populates="company")

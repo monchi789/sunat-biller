@@ -12,6 +12,7 @@ from app.models.idempotency import IdempotencyKey
 from app.models.snapshot import CompanySnapshot, CustomerSnapshot
 from app.models.sunat_submission import SunatSubmission
 from app.models.voided_document import VoidedDocument, VoidedDocumentItem
+from app.models.webhook import WebhookDelivery, WebhookEndpoint
 
 __all__ = [
     "APIKey",
@@ -36,4 +37,6 @@ __all__ = [
     "TimestampUpdateMixin",
     "VoidedDocument",
     "VoidedDocumentItem",
+    "WebhookDelivery",
+    "WebhookEndpoint",
 ]

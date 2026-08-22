@@ -1,0 +1,85 @@
+# Entorno completo del facturador. Funciona igual con `docker compose`.
+#
+#   podman-compose up -d && podman-compose exec api alembic upgrade head
+#
+# En producción, poner un reverse proxy con TLS delante de `api`: la aplicación
+# no termina HTTPS a propósito (RNF-01.5).
+
+services:
+  db:
+    image: docker.io/library/postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-sunat_biller}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: docker.io/library/redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Containerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-sunat_biller}
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_ROOT: /app/data/storage
+      CERTIFICATE_ROOT: /app/data/certificates
+    ports:
+      - "${API_PORT:-7890}:7890"
+    volumes:
+      - storage:/app/data/storage
+      - certificates:/app/data/certificates
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Containerfile
+    command: ["dramatiq", "app.worker", "--processes", "2", "--threads", "4"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-sunat_biller}
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_ROOT: /app/data/storage
+      CERTIFICATE_ROOT: /app/data/certificates
+    volumes:
+      # Comparte el storage con la API: el worker reenvía el XML ya firmado,
+      # nunca lo regenera (refirmar cambiaría el DigestValue del QR emitido).
+      - storage:/app/data/storage
+      - certificates:/app/data/certificates
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  storage:
+  certificates:
