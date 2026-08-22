@@ -37,21 +37,25 @@ Copiar este plan aprobado a **`/home/monchi789/Projects/sunat-biller/PLAN.md`** 
 
 ## Progreso
 
+> Última verificación: 2026-08-22 · 281 tests · ruff limpio · Pyright 0 errores en `app/`
+> · imagen del contenedor construida y con imports OK · migración verificada con
+> upgrade → downgrade → upgrade y sin deriva contra los modelos.
+
 ### Etapa 1 — Factura electrónica end-to-end
 - [x] 1.1 Bootstrap del repositorio
-- [~] 1.2 Núcleo de infraestructura (`app/core/`) — config, errors, logging listos; falta dependencies y main
-- [x] 1.3 Migraciones Alembic
-- [x] 1.4 Catálogos SUNAT (`app/catalogs/`)
-- [x] 1.5 Dominio (`app/domain/`)
-- [~] 1.6 Servicios base — crypto y storage listos; falta audit
-- [~] 1.7 Configuración multi-empresa — series listo; faltan companies, api-keys, certificates
-- [~] 1.8 Generación y firma del XML — namespaces, signer, zip, cdr_parser, ubl_invoice listos
-- [x] 1.9 Cliente SUNAT
+- [~] 1.2 Núcleo de infraestructura — `config`, `errors`, `logging` y `main` (con `/health`) listos; falta `dependencies.py` (depende de 1.7)
+- [x] 1.3 Migraciones Alembic — 20 tablas, ciclo reversible verificado
+- [x] 1.4 Catálogos SUNAT
+- [x] 1.5 Dominio — motor tributario al 100 % de cobertura
+- [~] 1.6 Servicios base — `crypto` y `file_storage` listos; falta `audit_service`
+- [~] 1.7 Configuración multi-empresa — `series_service` listo (concurrencia verificada); faltan companies, api-keys y certificates
+- [x] 1.8 Generación y firma del XML — firma verificada empíricamente, incluido test de manipulación
+- [x] 1.9 Cliente SUNAT — las 4 operaciones y la tabla de clasificación de errores
 - [ ] 1.10 Emisión de factura
-- [ ] 1.11 Webhooks salientes
-- [ ] 1.12 Worker
-- [~] 1.13 Tests — 236 verdes (dominio, catálogos, firma, UBL, SOAP, migraciones, concurrencia)
-- [ ] 1.14 Documentación
+- [~] 1.11 Webhooks salientes — modelos y migración listos; faltan servicio, router y entrega
+- [ ] 1.12 Worker — **el servicio está comentado en el compose hasta que exista**
+- [~] 1.13 Tests — 281 verdes; cobertura ≥90 % en `app/domain/`, `app/xml/`, `app/sunat/`
+- [ ] 1.14 Documentación — faltan `README.md`, `CLAUDE.md`, `docs/DESPLIEGUE.md`, `docs/INTEGRACION.md`
 
 ### Etapa 2 — Núcleo completo
 - [ ] 2.1 Boleta (03)
@@ -61,6 +65,22 @@ Copiar este plan aprobado a **`/home/monchi789/Projects/sunat-biller/PLAN.md`** 
 - [ ] 2.5 Consulta, descarga y PDF
 - [ ] 2.6 Robustez y observabilidad
 - [ ] 2.7 Tests de Etapa 2
+
+### Hallazgos de la revisión de Etapa 1
+
+La verificación encontró que se había commiteado infraestructura por delante del
+código del que depende. Corregido:
+
+| Hallazgo | Corrección |
+|---|---|
+| El `HEALTHCHECK` del contenedor apuntaba a `/health`, que no existía | `main.py` reescrito con `/health`, middleware de `request_id` y manejadores de error montados |
+| Podman **ignora** `HEALTHCHECK` al construir en formato OCI | El healthcheck se declara en el compose, donde sí se respeta |
+| El compose levantaba un servicio `worker` cuyo módulo no existe | Comentado con puntero al paso 1.12; un contenedor en bucle de reinicio es peor que ninguno |
+| `pyrightconfig.json` no apuntaba al venv → `make typecheck` reportaba 87 errores fantasma | Configurado `venvPath`/`venv`; estricto en `app/`, laxo en `tests/` para el acceso a `Optional` |
+| `crypto_service` y `file_storage_service` al **0 %** de cobertura pese a estar "listos" | 37 tests nuevos; ambos por encima del 94 % |
+| `zip_helper` al 61 %, por debajo del umbral que fija este mismo plan | Guardas anti zip-bomb cubiertas; 100 % |
+| `signxml` recibía el certificado como `bytes` donde declara `str` | Corregido; funcionaba por casualidad y se rompería al actualizar la librería |
+| El plan citaba `arq`, `respx` y `sunat_client_service.py`, ya descartados | Alineado con lo implementado |
 
 ---
 
@@ -74,11 +94,11 @@ Copiar este plan aprobado a **`/home/monchi789/Projects/sunat-biller/PLAN.md`** 
         │               │              │              │
         │        ┌──────▼─────┐ ┌──────▼──────┐ ┌────▼────────┐
         │        │ PostgreSQL │ │ Storage FS  │ │   Redis     │
-        │        │ (verdad)   │ │ /data/...   │ │ (cola arq)  │
+        │        │ (verdad)   │ │ /data/...   │ │ (cola dram.)│
         │        └──────┬─────┘ └─────────────┘ └────┬────────┘
         │               │                            │
         │        ┌──────▼────────────────────────────▼───────┐
-        └────────┤  Worker (arq)                             │──▶ SUNAT
+        └────────┤  Worker (dramatiq)                        │──▶ SUNAT
         webhook  │  · reintento sendBill  · poll de tickets  │    billService
         HMAC     │  · entrega de webhooks · reconciliación   │    (SOAP)
                  └───────────────────────────────────────────┘
@@ -219,8 +239,10 @@ La receta de la guía (`SECRET_KEY[:32].ljust(32)`) **no es un KDF** y es frági
 | `pyrightconfig.json` | añadir `tests` a `include` |
 | — | **primer commit** (el repo no tiene ninguno) |
 
-Dependencias de runtime a añadir: `lxml`, `signxml`, `cryptography`, `httpx`, `python-multipart`, `redis`, `arq`.
-Dependencias de dev: `pytest`, `pytest-cov`, `pytest-asyncio`, `respx`, `ruff`, `freezegun`, `factory-boy` (o fixtures a mano).
+Dependencias de runtime a añadir: `lxml`, `signxml`, `cryptography`, `httpx`, `python-multipart`, `redis`, `dramatiq[redis]`.
+Dependencias de dev: `pytest`, `pytest-cov`, `pytest-asyncio`, `ruff`, `freezegun`, `lxml-stubs`.
+
+> `respx` se descartó: el cliente SUNAT es `httpx` propio, así que inyectar `httpx.MockTransport` es la vía natural y no añade dependencia. `lxml-stubs` entra en su lugar, sin la cual Pyright no puede comprobar nada que toque `lxml.etree`.
 
 ### 1.2 Núcleo de infraestructura (`app/core/`)
 
@@ -272,9 +294,11 @@ Añadidos que la guía no contempla y hacen falta:
 - **`zip_helper.py`** — ZIP con el XML en la raíz, nombre exacto `{filename}.xml` dentro de `{filename}.zip`.
 - **`cdr_parser.py`** — abre el ZIP de respuesta, localiza `R-{filename}.xml`, extrae `cbc:ResponseCode`, `cbc:Description` y las notas de observación; clasifica con `cat cdr_codes`.
 
-### 1.9 Cliente SUNAT (`app/services/sunat_client_service.py`)
+### 1.9 Cliente SUNAT (`app/sunat/`)
 
-`send_bill(ruc, sol_user, sol_password, filename, zip_bytes) -> CdrResult`, más `get_status_cdr(...)`. WS-Security `UsernameToken` con `Username = {RUC}{sol_user}`. Timeout configurable, reintento inmediato acotado para errores de red, y traducción de SOAP Fault → `SunatError` con código clasificado. Envelope artesanal con `httpx`, según Decisiones técnicas.
+Paquete propio (`envelopes.py` + `client.py`) en lugar de un `sunat_client_service.py` suelto: la construcción de envelopes, el transporte y la clasificación de errores son tres responsabilidades separables y cada una tiene sus propios tests.
+
+`SunatClient.send_bill(credentials, filename, zip_bytes) -> CdrResult`, más `send_summary`, `get_status` y `get_status_cdr`. WS-Security `UsernameToken` con `Username = {RUC}{sol_user}`. Timeout configurable, reintento inmediato acotado para errores de red, y traducción de SOAP Fault → `SunatError` con código clasificado. Envelope artesanal con `httpx`, según Decisiones técnicas.
 
 Todas las llamadas quedan registradas como filas en `sunat_submissions` (el modelo ya soporta 1:N para historial de reintentos).
 
@@ -301,7 +325,7 @@ Firma HMAC-SHA256 sobre `{timestamp}.{body}`, cabeceras `X-Sunat-Biller-Signatur
 
 ### 1.12 Worker (`app/worker/`)
 
-Proceso `arq` separado en compose, compartiendo la imagen. Jobs de Etapa 1:
+Proceso `dramatiq` separado en compose, compartiendo la imagen. Jobs de Etapa 1:
 - `deliver_webhook(delivery_id)` — entrega con backoff.
 - `retry_send_bill(document_id)` — reintenta documentos en `SENT` sin CDR, con backoff y tope; consulta `getStatusCdr` antes de reenviar para no duplicar.
 - `sweep_pending` (cron, cada minuto) — barre `webhook_deliveries` y documentos atascados que Redis pudiera haber perdido. **PostgreSQL es la fuente de verdad; Redis es solo el disparador.**
@@ -340,11 +364,11 @@ tests/
     └── test_sunat_beta.py           # marcado @pytest.mark.beta, opt-in, contra BETA real
 ```
 
-Estrategia: unitarios con `Decimal` exacto; XML contra **golden files + XSD oficiales**; API con `TestClient` y el WS SUNAT mockeado con `respx`; concurrencia del correlativo con hilos reales contra PostgreSQL; E2E contra BETA excluido de CI por defecto.
+Estrategia: unitarios con `Decimal` exacto; XML contra **golden files + XSD oficiales**; API con `TestClient` y el WS SUNAT mockeado con `httpx.MockTransport`; concurrencia del correlativo con hilos reales contra PostgreSQL; E2E contra BETA excluido de CI por defecto.
 
 **Base de datos de test:** el propio PostgreSQL del compose sobre una BD separada `sunat_biller_test`, migrada con Alembic (no `create_all`, para que las migraciones se validen en cada corrida). Se descarta `testcontainers` para no exigir Docker-in-Docker en un entorno Podman. Cada test corre dentro de una transacción con rollback al final; los pocos que necesitan commits reales (concurrencia del correlativo) usan una fixture con limpieza explícita.
 
-**Fixtures clave:** `company_factory`, `api_key_factory` (devuelve el key en claro), `certificate_factory` (genera un PFX autofirmado con `cryptography` en tiempo de test — **nunca** se versiona un certificado real), `series_factory`, `invoice_payload_factory`, y `sunat_mock` (respx con escenarios: aceptado `0`, observado `4xxx`, rechazado `2xxx`, excepción `1xxx`, timeout, SOAP Fault).
+**Fixtures clave:** `company_factory`, `api_key_factory` (devuelve el key en claro), `certificate_factory` (genera un PFX autofirmado con `cryptography` en tiempo de test — **nunca** se versiona un certificado real), `series_factory`, `invoice_payload_factory`, y `sunat_transport` (`httpx.MockTransport` con escenarios: aceptado `0`, observado `4xxx`, rechazado `2xxx`, excepción `1xxx`, timeout, SOAP Fault).
 
 ### 1.14 Documentación de Etapa 1
 
@@ -367,7 +391,7 @@ Todo lo que sigue reutiliza el andamiaje de la Etapa 1 sin inventar arquitectura
 `receipt_service.emit_receipt` — mismo flujo hasta firmar, **sin llamada a SUNAT**, termina en `SIGNED`. Reutiliza `ubl_invoice.py` cambiando `InvoiceTypeCode`, `schemeID` del receptor (DNI `1`) y el caso "público en general". Regla del umbral (`RECEIPT_CUSTOMER_THRESHOLD`, S/ 700): sobre el umbral el cliente pasa a ser obligatorio. Router `POST /receipts`.
 
 ### 2.2 Resumen Diario (RC) — flujo asíncrono con ticket
-`ubl_summary.py` (`SummaryDocuments` con `sac:SummaryDocumentsLine`), `sunat_client_service.send_summary` → ticket, `get_status(ticket)` → CDR. `daily_summary_service` con generación del identificador `RC-YYYYMMDD-NNN` correlativo por empresa/fecha. Router `POST /daily-summaries`, `GET /daily-summaries/{id}`, `POST /daily-summaries/{id}/poll`.
+`ubl_summary.py` (`SummaryDocuments` con `sac:SummaryDocumentsLine`), `SunatClient.send_summary` → ticket, `get_status(ticket)` → CDR. `daily_summary_service` con generación del identificador `RC-YYYYMMDD-NNN` correlativo por empresa/fecha. Router `POST /daily-summaries`, `GET /daily-summaries/{id}`, `POST /daily-summaries/{id}/poll`.
 
 **Mejora sobre la guía:** además del `/poll` manual, un job `poll_ticket(summary_id)` en el worker que consulta con backoff hasta resolver el ticket y emite webhook `daily_summary.accepted` / `.rejected`, marcando las boletas como `ACCEPTED`. El integrador no debería tener que hacer polling.
 

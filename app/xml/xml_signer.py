@@ -26,8 +26,10 @@ from typing import Final
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import Certificate
 from lxml import etree
-from signxml import XMLSigner, XMLVerifier, methods
+from signxml import methods
 from signxml.algorithms import CanonicalizationMethod, DigestAlgorithm, SignatureMethod
+from signxml.signer import XMLSigner
+from signxml.verifier import XMLVerifier
 
 from app.core.errors import SigningError
 from app.xml.namespaces import DS, ds, ext
@@ -71,7 +73,7 @@ def sign_xml(
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     )
-    cert_pem = certificate.public_bytes(serialization.Encoding.PEM)
+    cert_pem = certificate.public_bytes(serialization.Encoding.PEM).decode("ascii")
 
     try:
         signed = _SIGNER.sign(
@@ -113,7 +115,7 @@ def extract_digest_value(signed_xml: bytes) -> str:
 
 def verify_signature(signed_xml: bytes, certificate: Certificate) -> None:
     """Verifica la firma. Lanza si no es válida. Se usa en tests y diagnóstico."""
-    cert_pem = certificate.public_bytes(serialization.Encoding.PEM)
+    cert_pem = certificate.public_bytes(serialization.Encoding.PEM).decode("ascii")
     try:
         XMLVerifier().verify(signed_xml, x509_cert=cert_pem, expect_references=1)
     except Exception as exc:

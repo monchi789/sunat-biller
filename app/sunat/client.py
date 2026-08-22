@@ -11,7 +11,7 @@ from __future__ import annotations
 import base64
 from dataclasses import dataclass
 from enum import Enum
-from typing import Final
+from typing import Final, cast
 
 import httpx
 from lxml import etree
@@ -62,9 +62,14 @@ class SunatCredentials:
     sol_password: str
 
 
+def _elements(node: etree._Element, name: str) -> list[etree._Element]:
+    """`xpath` declara una unión (bool | float | str | list); acá siempre es lista."""
+    return cast("list[etree._Element]", node.xpath(f"//*[local-name()='{name}']"))
+
+
 def _local(node: etree._Element, name: str) -> str | None:
     """Busca por `local-name()`: los prefijos de SUNAT varían entre ambientes."""
-    for element in node.xpath(f"//*[local-name()='{name}']"):
+    for element in _elements(node, name):
         if element.text and element.text.strip():
             return element.text.strip()
     return None
@@ -72,7 +77,7 @@ def _local(node: etree._Element, name: str) -> str | None:
 
 def _raise_for_fault(root: etree._Element) -> None:
     """Convierte un `soap:Fault` en `SunatError` ya clasificado."""
-    faults = root.xpath("//*[local-name()='Fault']")
+    faults = _elements(root, "Fault")
     if not faults:
         return
 

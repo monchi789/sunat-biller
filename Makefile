@@ -78,7 +78,10 @@ fmt:  ## Corrige estilo automáticamente
 	$(PY) -m ruff format app tests
 
 .PHONY: typecheck
-typecheck:  ## Revisa tipos con Pyright
+typecheck:  ## Revisa tipos con Pyright (estricto en app/, laxo en tests/)
+	# En tests/ se relajan las reglas de Optional: `find()` y `xpath()` devuelven
+	# uniones, y una aserción sobre None ya hace fallar el test. Envolver cada
+	# búsqueda en un assert añadiría ruido sin atrapar nada. En app/ no se relaja nada.
 	npx --yes pyright
 
 .PHONY: check

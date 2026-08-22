@@ -46,7 +46,7 @@ RUN mkdir -p /app/data/storage /app/data/certificates && chown -R biller:biller 
 USER biller
 EXPOSE 7890
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -fsS http://localhost:7890/health || exit 1
+# El healthcheck se declara en podman-compose.yml, no aquí: Podman ignora la
+# instrucción HEALTHCHECK cuando construye en formato OCI (su default).
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7890"]

@@ -1,6 +1,23 @@
 {
-  "include": ["app"],
+  "include": ["app", "tests"],
+  "exclude": ["**/__pycache__", ".venv", "alembic/versions"],
   "pythonVersion": "3.13",
+  "venvPath": ".",
+  "venv": ".venv",
   "typeCheckingMode": "standard",
-  "reportImportCycles": false
+  "reportImportCycles": false,
+
+  "executionEnvironments": [
+    { "root": "app" },
+    {
+      "root": "tests",
+      "reportOptionalMemberAccess": "none",
+      "reportOptionalSubscript": "none",
+      "reportAttributeAccessIssue": "none",
+      "reportIndexIssue": "none",
+      "reportArgumentType": "none",
+      "reportGeneralTypeIssues": "none",
+      "reportOperatorIssue": "none"
+    }
+  ]
 }

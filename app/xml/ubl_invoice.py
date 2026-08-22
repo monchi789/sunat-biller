@@ -8,6 +8,7 @@ el XSD y el rechazo resultante es poco descriptivo.
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any, cast
 
 from lxml import etree
 
@@ -46,7 +47,9 @@ _UNIT = {
 
 
 def _sub(parent: etree._Element, tag: str, text: str | None = None, **attrs: str) -> etree._Element:
-    element = etree.SubElement(parent, tag, **attrs)
+    # `attrib=` explícito en vez de `**attrs`: los nombres de atributo de SUNAT
+    # (listID, schemeURI…) colisionarían con los parámetros propios de lxml.
+    element = etree.SubElement(parent, tag, attrib=attrs or None)
     if text is not None:
         element.text = text
     return element
@@ -253,7 +256,7 @@ def _build_line_tax_total(
 
 def build_invoice(ctx: DocumentContext, *, igv_rate: Decimal) -> etree._Element:
     """Construye el árbol del `Invoice`, con el placeholder de firma listo."""
-    root = etree.Element(f"{{{INVOICE}}}Invoice", nsmap=nsmap(INVOICE))
+    root = etree.Element(f"{{{INVOICE}}}Invoice", nsmap=cast("Any", nsmap(INVOICE)))
 
     build_ubl_extensions(root)
 

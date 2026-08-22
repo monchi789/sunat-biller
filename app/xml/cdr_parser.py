@@ -8,6 +8,7 @@ varían entre el ambiente beta, producción y los OSE.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import cast
 
 from lxml import etree
 
@@ -35,9 +36,13 @@ class CdrResult:
         return self.outcome is CdrOutcome.ACCEPTED_WITH_OBSERVATION or bool(self.notes)
 
 
+def _elements(node: etree._Element, local_name: str) -> list[etree._Element]:
+    """`xpath` declara una unión (bool | float | str | list); acá siempre es lista."""
+    return cast("list[etree._Element]", node.xpath(f".//*[local-name()='{local_name}']"))
+
+
 def _first_text(node: etree._Element, local_name: str) -> str | None:
-    found = node.xpath(f".//*[local-name()='{local_name}']")
-    for element in found:
+    for element in _elements(node, local_name):
         if element.text and element.text.strip():
             return element.text.strip()
     return None
@@ -46,7 +51,7 @@ def _first_text(node: etree._Element, local_name: str) -> str | None:
 def _all_texts(node: etree._Element, local_name: str) -> list[str]:
     return [
         element.text.strip()
-        for element in node.xpath(f".//*[local-name()='{local_name}']")
+        for element in _elements(node, local_name)
         if element.text and element.text.strip()
     ]
 
