@@ -62,17 +62,6 @@ cryptography         — lectura de certificados PFX (.p12)
 httpx                — cliente HTTP async para llamadas al WS SUNAT
 ```
 
-**Dependencias a agregar (no están aún en pyproject.toml):**
-
-```toml
-lxml = ">=5.0.0"
-signxml = ">=3.0.0"
-cryptography = ">=42.0.0"
-httpx = ">=0.27.0"
-python-multipart = ">=0.0.9"   # para upload de certificados
-```
-
----
 
 ## 3. Requerimientos Funcionales
 

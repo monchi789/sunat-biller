@@ -37,25 +37,25 @@ Copiar este plan aprobado a **`/home/monchi789/Projects/sunat-biller/PLAN.md`** 
 
 ## Progreso
 
-> Última verificación: 2026-08-22 · 281 tests · ruff limpio · Pyright 0 errores en `app/`
-> · imagen del contenedor construida y con imports OK · migración verificada con
-> upgrade → downgrade → upgrade y sin deriva contra los modelos.
+> Última verificación: 2026-08-22 · **358 tests** · ruff limpio · Pyright 0 errores
+> · cobertura 91 % · **factura real aceptada por SUNAT BETA** (`sunat_code = 0`),
+> con XML firmado y CDR descargados.
 
 ### Etapa 1 — Factura electrónica end-to-end
 - [x] 1.1 Bootstrap del repositorio
-- [~] 1.2 Núcleo de infraestructura — `config`, `errors`, `logging` y `main` (con `/health`) listos; falta `dependencies.py` (depende de 1.7)
+- [x] 1.2 Núcleo de infraestructura — config con `APP_ENV`, errores, logging, `dependencies.py` y `main` con routers montados
 - [x] 1.3 Migraciones Alembic — 20 tablas, ciclo reversible verificado
 - [x] 1.4 Catálogos SUNAT
 - [x] 1.5 Dominio — motor tributario al 100 % de cobertura
-- [~] 1.6 Servicios base — `crypto` y `file_storage` listos; falta `audit_service`
-- [~] 1.7 Configuración multi-empresa — `series_service` listo (concurrencia verificada); faltan companies, api-keys y certificates
+- [x] 1.6 Servicios base — `crypto`, `file_storage` y `audit_service`
+- [x] 1.7 Configuración multi-empresa — companies, api-keys, certificates y series, con sus routers
 - [x] 1.8 Generación y firma del XML — firma verificada empíricamente, incluido test de manipulación
 - [x] 1.9 Cliente SUNAT — las 4 operaciones y la tabla de clasificación de errores
-- [ ] 1.10 Emisión de factura
+- [x] 1.10 Emisión de factura — `POST /invoices` en tres transacciones, con idempotencia
 - [~] 1.11 Webhooks salientes — modelos y migración listos; faltan servicio, router y entrega
 - [ ] 1.12 Worker — **el servicio está comentado en el compose hasta que exista**
-- [~] 1.13 Tests — 281 verdes; cobertura ≥90 % en `app/domain/`, `app/xml/`, `app/sunat/`
-- [ ] 1.14 Documentación — faltan `README.md`, `CLAUDE.md`, `docs/DESPLIEGUE.md`, `docs/INTEGRACION.md`
+- [~] 1.13 Tests — 358 verdes, 91 % de cobertura; falta la marca `beta` automatizada
+- [~] 1.14 Documentación — `README.md` y `docs/PRUEBAS.md` listos; faltan `CLAUDE.md`, `docs/DESPLIEGUE.md` y `docs/INTEGRACION.md`
 
 ### Etapa 2 — Núcleo completo
 - [ ] 2.1 Boleta (03)
@@ -65,6 +65,22 @@ Copiar este plan aprobado a **`/home/monchi789/Projects/sunat-biller/PLAN.md`** 
 - [ ] 2.5 Consulta, descarga y PDF
 - [ ] 2.6 Robustez y observabilidad
 - [ ] 2.7 Tests de Etapa 2
+
+### Hallazgos de la tanda de endpoints
+
+Cinco bugs que solo aparecieron al ejercitar el servicio de verdad:
+
+| Hallazgo | Detalle |
+|---|---|
+| `logger.info(extra={"filename": ...})` reventaba | `filename` es atributo interno de `LogRecord` y `logging` lanza `KeyError`. **Solo falla con el nivel INFO activo**, así que pasaba los tests y moría en el servidor. Resuelto con un adaptador que renombra las claves reservadas. |
+| El 500 no dejaba rastro | El manejador de errores no registraba la traza: un fallo interno era indepurable. Ahora se registra del lado del servidor sin filtrarla al cliente. |
+| `alembic` apagaba los logs de la app | `fileConfig` desactiva por defecto los loggers ya creados. Migrar en proceso dejaba la aplicación muda. |
+| El CDR nunca se guardaba | `GET /documents/{id}/cdr` devolvía 404 aunque SUNAT hubiera aceptado. El CDR es el respaldo de la recepción: ahora se archiva. |
+| La reserva de idempotencia guardaba un cuerpo vacío | El segundo intento no encontraba qué devolver y chocaba con la restricción única, respondiendo 409 en vez de repetir la respuesta. |
+
+Además, `Settings` mezclaba el entorno de despliegue con el ambiente de SUNAT:
+exigía secretos reales según `SUNAT_ENVIRONMENT`, así que un despliegue
+productivo contra beta arrancaba con `SECRET_KEY=change-me-in-production`.
 
 ### Hallazgos de la revisión de Etapa 1
 

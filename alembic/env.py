@@ -28,7 +28,11 @@ def _database_url() -> str:
     return config.get_main_option("sqlalchemy.url") or settings.DATABASE_URL
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # `disable_existing_loggers=False` es imprescindible: por defecto `fileConfig`
+    # **apaga todos los loggers ya creados** que no estén en el .ini. Como
+    # `app/` crea los suyos al importarse, migrar en proceso dejaba la aplicación
+    # sin logs hasta reiniciarla.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
