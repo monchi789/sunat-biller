@@ -14,7 +14,10 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.core.logging import get_logger
 from app.schemas.common import ErrorResponse
+
+logger = get_logger(__name__)
 
 
 class DomainError(Exception):
@@ -145,8 +148,17 @@ async def validation_error_handler(_: Request, exc: Exception) -> JSONResponse:
     )
 
 
-async def unhandled_error_handler(_: Request, exc: Exception) -> JSONResponse:
-    """Última red de seguridad: nunca filtrar trazas ni secretos al cliente."""
+async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Última red de seguridad: nunca filtrar trazas ni secretos al cliente.
+
+    Pero **sí** se registra la traza completa del lado del servidor: un 500 sin
+    rastro en los logs es indepurable.
+    """
+    logger.exception(
+        "error no controlado",
+        exc_info=exc,
+        extra={"path": request.url.path, "method": request.method},
+    )
     return _json(
         status.HTTP_500_INTERNAL_SERVER_ERROR,
         ErrorResponse(

@@ -21,6 +21,15 @@ env:  ## Crea .env desde la plantilla si no existe
 secret:  ## Genera una clave Fernet para ENCRYPTION_KEY
 	@$(PY) -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 
+.PHONY: admin-token
+admin-token:  ## Genera un valor para ADMIN_TOKEN
+	@$(PY) -c "import secrets; print(secrets.token_urlsafe(32))"
+
+.PHONY: test-cert
+test-cert:  ## Genera un certificado de prueba (uso: make test-cert RUC=10... NAME="MI NEGOCIO")
+	@test -n "$(RUC)" || (echo "Falta RUC. Uso: make test-cert RUC=10123456781 NAME=\"MI NEGOCIO\""; exit 1)
+	@$(PY) -m app.tools.test_certificate --ruc "$(RUC)" --name "$(or $(NAME),EMISOR DE PRUEBA)"
+
 # ── contenedores ────────────────────────────────────────────────────────────
 .PHONY: up
 up: env  ## Levanta todo el stack

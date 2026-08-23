@@ -18,6 +18,14 @@ from app.schemas.document_item import DocumentItemCreate, InstallmentCreate
 
 
 class DocumentCreateBase(BaseSchema):
+    series: str | None = Field(
+        default=None,
+        pattern=r"^[A-Z]\d{3}$",
+        description=(
+            "Serie a usar, p. ej. `F001`. Si se omite y la empresa tiene una sola "
+            "serie activa para el tipo de documento, se usa esa."
+        ),
+    )
     issue_date: date
     issue_time: time | None = None
     currency: CurrencyCode
