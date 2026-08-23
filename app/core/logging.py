@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from collections.abc import MutableMapping
 from contextvars import ContextVar
 from typing import Any
 
@@ -42,10 +43,11 @@ class JsonFormatter(logging.Formatter):
             if value:
                 payload[key] = value
 
-        # `extra={...}` del llamador
+        # `extra={...}` del llamador. `SafeExtraAdapter` prefija las claves que
+        # chocan con `LogRecord`; aquí se devuelve el nombre original.
         for key, value in record.__dict__.items():
             if key not in _RESERVED and not key.startswith("_"):
-                payload[key] = value
+                payload[key.removeprefix("ctx_")] = value
 
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
@@ -69,5 +71,27 @@ def configure_logging(*, debug: bool = False) -> None:
         logger.propagate = True
 
 
-def get_logger(name: str) -> logging.Logger:
-    return logging.getLogger(name)
+class SafeExtraAdapter(logging.LoggerAdapter):
+    """Evita el choque entre `extra=` y los atributos internos de `LogRecord`.
+
+    `logging.makeRecord` lanza ``KeyError: Attempt to overwrite 'filename'`` si
+    `extra` trae una clave reservada —`filename`, `module`, `name`, `process`…—.
+    Y lo hace **solo cuando el nivel está habilitado**, así que un `logger.info`
+    con una clave reservada funciona en los tests (nivel WARNING) y revienta en
+    producción. Renombrar aquí mata esa clase de fallo de una vez.
+    """
+
+    def process(
+        self, msg: Any, kwargs: MutableMapping[str, Any]
+    ) -> tuple[Any, MutableMapping[str, Any]]:
+        extra = kwargs.get("extra")
+        if extra:
+            kwargs["extra"] = {
+                (f"ctx_{key}" if key in _RESERVED else key): value
+                for key, value in extra.items()
+            }
+        return msg, kwargs
+
+
+def get_logger(name: str) -> SafeExtraAdapter:
+    return SafeExtraAdapter(logging.getLogger(name), {})

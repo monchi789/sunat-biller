@@ -14,6 +14,7 @@ from fastapi import FastAPI, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.errors import (
     DomainError,
@@ -31,11 +32,39 @@ Facturador electrónico SUNAT (Perú) como microservicio.
 Emite comprobantes de pago electrónicos en formato UBL 2.1, los firma con el
 certificado digital de la empresa y los envía a SUNAT.
 
-**Autenticación**: cabecera `X-API-Key` en todos los endpoints salvo `/health`.
+## Autenticación
 
-**Idempotencia**: envía `X-Idempotency-Key` en las emisiones para que un reintento
-del cliente no genere un comprobante duplicado.
+Dos mecanismos, para dos usos distintos:
+
+- **`X-API-Key`** — identifica a una empresa. Es lo que usan las aplicaciones
+  integradas; cada empresa solo ve sus propios recursos.
+- **`X-Admin-Token`** — autoriza el aprovisionamiento (crear empresas y emitir
+  sus API keys). Existe porque toda API key pertenece a una empresa, así que la
+  primera empresa no puede crearse con una.
+
+`/health` no requiere autenticación.
+
+## Idempotencia
+
+Envía `X-Idempotency-Key` al emitir para que un reintento de red no genere un
+comprobante duplicado. La respuesta original se devuelve durante 24 horas.
+
+## Respuestas de SUNAT
+
+Un **rechazo de SUNAT llega como HTTP 200** con `status = REJECTED`: es una
+respuesta válida del servicio, no un error de tu petición. Revisa siempre el
+campo `status` del cuerpo.
 """
+
+TAGS_METADATA = [
+    {"name": "Empresas", "description": "Alta y configuración de las empresas emisoras."},
+    {"name": "API Keys", "description": "Credenciales de las aplicaciones integradas."},
+    {"name": "Certificados", "description": "Certificados digitales para firmar los comprobantes."},
+    {"name": "Series", "description": "Series de numeración por tipo de comprobante."},
+    {"name": "Facturas", "description": "Emisión de facturas electrónicas (tipo 01)."},
+    {"name": "Comprobantes", "description": "Consulta y descarga de lo emitido."},
+    {"name": "salud", "description": "Estado del servicio."},
+]
 
 
 @asynccontextmanager
@@ -49,21 +78,32 @@ async def lifespan(_: FastAPI):
 
     logger.info(
         "facturador iniciado",
-        extra={"environment": settings.SUNAT_ENVIRONMENT.value, "debug": settings.DEBUG},
+        extra={
+            "app_env": settings.APP_ENV.value,
+            "sunat_environment": settings.SUNAT_ENVIRONMENT.value,
+            "docs_enabled": settings.docs_enabled,
+            "debug": settings.DEBUG,
+        },
     )
     yield
     logger.info("facturador detenido")
 
 
+# En producción no se publica la documentación interactiva ni el esquema: es
+# superficie de información sobre el servicio que no aporta nada al integrador,
+# que ya tiene `docs/INTEGRACION.md`. Se controla con APP_ENV en el .env.
 app = FastAPI(
     title="sunat-biller",
     description=DESCRIPTION,
     version=settings.VERSION,
     lifespan=lifespan,
-    openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    openapi_tags=TAGS_METADATA,
+    openapi_url=f"{settings.API_V1_PREFIX}/openapi.json" if settings.docs_enabled else None,
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url="/redoc" if settings.docs_enabled else None,
 )
+
+app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 if settings.cors_origin_list:
     app.add_middleware(
@@ -121,6 +161,7 @@ async def health() -> dict[str, Any]:
         "status": "ok",
         "service": settings.PROJECT_NAME,
         "version": settings.VERSION,
+        "app_env": settings.APP_ENV.value,
         "sunat_environment": settings.SUNAT_ENVIRONMENT.value,
     }
 

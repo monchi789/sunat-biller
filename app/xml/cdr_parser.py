@@ -27,6 +27,13 @@ class CdrResult:
     notes: list[str] = field(default_factory=list)
     """Observaciones (códigos 4xxx). El comprobante se acepta igual."""
 
+    raw_xml: bytes | None = None
+    """El CDR tal cual llegó.
+
+    Se conserva porque es el **respaldo legal** de que SUNAT recibió el
+    comprobante: hay que archivarlo y poder entregárselo al contribuyente.
+    """
+
     @property
     def is_accepted(self) -> bool:
         return self.outcome in (CdrOutcome.ACCEPTED, CdrOutcome.ACCEPTED_WITH_OBSERVATION)
@@ -82,4 +89,5 @@ def parse_cdr(cdr_xml: bytes) -> CdrResult:
         outcome=classify_cdr_code(response_code),
         reference_id=reference_id,
         notes=notes,
+        raw_xml=cdr_xml,
     )

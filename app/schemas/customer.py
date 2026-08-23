@@ -9,7 +9,7 @@ class CustomerCreate(BaseSchema):
     name: str = Field(min_length=1, max_length=255)
     address: str | None = Field(default=None, max_length=500)
     ubigeo: str | None = Field(default=None, pattern=r"^\d{6}$")
-    country_code: str = Field(pattern=r"^[A-Z]{2}$")
+    country_code: str = Field(default="PE", pattern=r"^[A-Z]{2}$")
 
     @model_validator(mode="after")
     def validate_document_number(self) -> "CustomerCreate":
